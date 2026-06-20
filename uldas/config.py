@@ -66,6 +66,20 @@ class Config:
         # ── Timeouts ─────────────────────────────────────────────────────
         self.operation_timeout_seconds: int = 600
 
+        # ── Webhook (fire after remux) ───────────────────────────────────
+        self.webhook_enabled: bool = False
+        self.webhook_preset: str = "custom"  # custom | autoscan | autopulse (UI only)
+        self.webhook_url: str = ""
+        self.webhook_method: str = "POST"  # GET | POST
+        self.webhook_content_type: str = "none"  # form | json | none
+        self.webhook_body: str = ""
+        self.webhook_headers: list[str] = []  # "Key: Value" lines
+        self.webhook_auth_user: str = ""
+        self.webhook_auth_pass: str = ""
+        self.webhook_timeout_seconds: int = 10
+        self.webhook_path_from: str = ""
+        self.webhook_path_to: str = ""
+
         # ── Forced subtitle thresholds ───────────────────────────────────
         self.forced_subtitle_low_coverage_threshold: float = 25.0
         self.forced_subtitle_high_coverage_threshold: float = 50.0
@@ -127,6 +141,17 @@ class Config:
             "subtitle_confidence_threshold": 0.85,
             "reprocess_all_subtitles": False,
             "operation_timeout_seconds": 600,
+            "webhook_enabled": False,
+            "webhook_url": "",
+            "webhook_method": "POST",
+            "webhook_content_type": "none",
+            "webhook_body": "",
+            "webhook_headers": [],
+            "webhook_auth_user": "",
+            "webhook_auth_pass": "",
+            "webhook_timeout_seconds": 10,
+            "webhook_path_from": "",
+            "webhook_path_to": "",
             "forced_subtitle_low_density_threshold": 3.0,
             "forced_subtitle_high_density_threshold": 8.0,
             "forced_subtitle_low_coverage_threshold": 25.0,
