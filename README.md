@@ -40,6 +40,7 @@ Requires
   - [Expert variables](#expert-variables)
   - [Model Size Guide](#model-size-guide)
 - [🌐 WebUI](#webui)
+- [🔔 Webhook on Remux](#webhook-on-remux)
 - [📄 Supported File Formats](#supported-file-formats)
 - [⌨️ CLI Reference](#cli-reference)
   - [Utility Commands](#utility-commands)
@@ -238,6 +239,34 @@ Absolute count thresholds:
 You can access the webui via localhost:2119
 Here you can edit settings and check your log.
 [Screenshots](#webuiss)
+
+***
+
+<a id="webhook-on-remux"></a>
+## 🔔 Webhook on Remux
+
+ULDAS can send an HTTP request after each remux. (e.g. for triggering Autoscan/Autopulse/..)
+Enable it in the WebUI under **Settings → Advanced → Webhook**, or in `config.yml`.
+
+| Variable | Value |
+| --- | --- |
+| `{path}` / `{path_enc}` | Full path of the remuxed `.mkv` (raw / URL-encoded) |
+| `{dir}` / `{dir_enc}` | Parent folder of the file |
+| `{filename}` | File name with extension |
+| `{name_noext}` | File name without extension |
+| `{old_path}` / `{old_path_enc}` | Original pre-remux file path |
+
+> Use the `_enc` variants whenever the value goes into a URL query string or a form body, since media paths contain spaces and special characters.
+
+**Extra options**
+
+| Key | Description |
+| --- | --- |
+| `webhook_headers` | Extra request headers, one `Key: Value` per line (e.g. an API token) |
+| `webhook_timeout_seconds` | Request timeout (default `10`). The call is fire-and-forget — it never blocks or fails a run |
+| `webhook_path_from` / `webhook_path_to` | Optional path remap, for when ULDAS's container mounts differ from your media server's. The leading `from` path is replaced with `to` before the `{path}` variables are built |
+
+The webhook only fires on an actual remux (the rename event), never on in-place language-tag edits, and is skipped entirely during `dry_run`.
 
 ***
 

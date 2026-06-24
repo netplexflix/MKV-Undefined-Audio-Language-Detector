@@ -323,6 +323,13 @@ input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, 
 input[type="number"] { width: 100px; }
 select { min-width: 120px; }
 
+/* Highlight a field that a preset expects the user to fill (e.g. password). */
+input.input-needs-value {
+    border-color: var(--warning);
+    box-shadow: 0 0 6px var(--warning);
+}
+input.input-needs-value::placeholder { color: var(--warning); }
+
 /* Path list */
 .path-list { display: flex; flex-direction: column; gap: 6px; min-width: 280px; }
 
@@ -401,12 +408,7 @@ select { min-width: 120px; }
     color: var(--warning);
 }
 
-/* Maintenance actions (inside Advanced) */
-.maintenance-actions {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-}
+/* Maintenance actions (own card) */
 .maintenance-actions h3 {
     font-size: 15px;
     font-weight: 600;
@@ -1411,9 +1413,14 @@ input[type="date"] { color-scheme: dark; }
             These settings affect how ULDAS processes and detects languages. Only change them if you understand their impact.
         </div>
         <div id="advanced-options"></div>
+    </div>
+    <div class="settings-section" id="webhook-settings" style="display:none">
+        <h2>Webhook</h2>
+        <div id="webhook-options"></div>
+    </div>
+    <div class="settings-section" id="maintenance-settings" style="display:none">
+        <h2>Maintenance Actions</h2>
         <div class="maintenance-actions">
-            <h3>Maintenance Actions</h3>
-
             <div class="maintenance-action" data-action="reprocess-language">
                 <div class="maintenance-action-label">Reprocess audio tracks tagged as a specific language</div>
                 <div class="maintenance-action-desc">
@@ -2038,14 +2045,18 @@ function renderSettings() {
     const basic = document.getElementById('basic-options');
     const advanced = document.getElementById('advanced-options');
     const scheduler = document.getElementById('scheduler-options');
+    const webhook = document.getElementById('webhook-options');
     basic.innerHTML = '';
     advanced.innerHTML = '';
     if (scheduler) scheduler.innerHTML = '';
+    if (webhook) webhook.innerHTML = '';
 
     configOptions.forEach(opt => {
         const el = createSettingItem(opt);
         if (opt.section === 'scheduler' && scheduler) {
             scheduler.appendChild(el);
+        } else if (opt.section === 'webhook' && webhook) {
+            webhook.appendChild(el);
         } else if (opt.advanced) {
             advanced.appendChild(el);
         } else {
@@ -2057,6 +2068,94 @@ function renderSettings() {
     const typeSel = document.querySelector('#scheduler-options [data-key="schedule_type"]');
     if (typeSel) {
         typeSel.addEventListener('change', updateSchedulerFieldState);
+    }
+
+    const presetSel = document.querySelector('[data-key="webhook_preset"]');
+    if (presetSel) {
+        presetSel.addEventListener('change', () => applyWebhookPreset(presetSel.value));
+    }
+    const passEl = document.querySelector('[data-key="webhook_auth_pass"]');
+    if (passEl) {
+        passEl.addEventListener('input', () => {
+            if (passEl.value.trim()) {
+                passEl.classList.remove('input-needs-value');
+                passEl.placeholder = '';
+            }
+        });
+    }
+}
+
+const WEBHOOK_PRESETS = {
+    'autopulse': {
+        requiresAuth: true,
+        fields: {
+            webhook_url: 'http://CHANGE_ME:2875/triggers/manual?path={path_enc}',
+            webhook_method: 'POST',
+            webhook_content_type: 'none',
+            webhook_body: '',
+        },
+    },
+    'autoscan (Cloudbox)': {
+        requiresAuth: true,
+        fields: {
+            webhook_url: 'http://CHANGE_ME:3030/triggers/manual?dir={dir_enc}',
+            webhook_method: 'POST',
+            webhook_content_type: 'none',
+            webhook_body: '',
+        },
+    },
+    'autoscan (NiNiyas)': {
+        requiresAuth: false,
+        fields: {
+            webhook_url: 'http://CHANGE_ME:3468/YOUR_SERVER_PASS',
+            webhook_method: 'POST',
+            webhook_content_type: 'form',
+            webhook_body: 'eventType=Manual&filepath={path_enc}',
+        },
+    },
+};
+
+function setWebhookField(key, value) {
+    const el = document.querySelector(`[data-key="${key}"]`);
+    if (el) el.value = value;
+}
+
+function applyWebhookPreset(preset) {
+    const passEl = document.querySelector('[data-key="webhook_auth_pass"]');
+    // Clear any previous "password required" indicator before re-evaluating.
+    if (passEl) {
+        passEl.classList.remove('input-needs-value');
+        passEl.placeholder = '';
+    }
+
+    const def = WEBHOOK_PRESETS[preset];
+
+    if (!def) {
+        // 'custom': wipe the fields presets manage so the form starts blank
+        // instead of keeping the previously selected preset's values.
+        setWebhookField('webhook_url', '');
+        setWebhookField('webhook_method', 'POST');
+        setWebhookField('webhook_content_type', 'none');
+        setWebhookField('webhook_body', '');
+        setWebhookField('webhook_auth_user', '');
+        setWebhookField('webhook_auth_pass', '');
+        return;
+    }
+
+    Object.entries(def.fields).forEach(([key, value]) => setWebhookField(key, value));
+
+    if (def.requiresAuth) {
+        const userEl = document.querySelector('[data-key="webhook_auth_user"]');
+        if (userEl && !userEl.value.trim()) userEl.value = 'admin';
+        if (passEl && !passEl.value.trim()) {
+            passEl.classList.add('input-needs-value');
+            passEl.placeholder = 'Password required';
+        }
+    } else {
+        // Preset doesn't use Basic Auth — clear any stale credentials a
+        // previously selected preset may have filled in.
+        setWebhookField('webhook_auth_user', '');
+        setWebhookField('webhook_auth_pass', '');
     }
 }
 
@@ -2228,7 +2327,11 @@ async function saveConfig() {
 
 /* Advanced toggle */
 document.getElementById('toggle-advanced').addEventListener('change', function() {
-    document.getElementById('advanced-settings').style.display = this.checked ? 'block' : 'none';
+    const display = this.checked ? 'block' : 'none';
+    ['advanced-settings', 'webhook-settings', 'maintenance-settings'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = display;
+    });
     if (this.checked) {
         loadReprocessLanguages();
         refreshIndexStatus();
@@ -3056,10 +3159,11 @@ fetchUpdateStatus();
    only flips on the change event). Force the state into sync here. */
 (function resetAdvancedToggle() {
     const toggle = document.getElementById('toggle-advanced');
-    const panel = document.getElementById('advanced-settings');
+    const panels = ['advanced-settings', 'webhook-settings', 'maintenance-settings']
+        .map(id => document.getElementById(id));
     const apply = () => {
         if (toggle) toggle.checked = false;
-        if (panel) panel.style.display = 'none';
+        panels.forEach(p => { if (p) p.style.display = 'none'; });
     };
     apply();
     window.addEventListener('pageshow', apply);

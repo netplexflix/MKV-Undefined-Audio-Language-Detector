@@ -1410,7 +1410,21 @@ class MKVLanguageDetector:
                     print(f"[{action_idx}/{action_total}] Processing: {fp.name}")
 
                 cached_key = key_cache.get(str(fp))
-                results.append(self.process_file(fp, _cached_key=cached_key))
+                res = self.process_file(fp, _cached_key=cached_key)
+                results.append(res)
+                # Notify external scan tools once the remuxed file is fully processed (language tags already re-applied above).
+                if (res.get("was_remuxed") and not self.config.dry_run
+                        and getattr(self.config, "webhook_enabled", False)):
+                    try:
+                        from uldas import webhook
+                        webhook.send_remux_webhook(
+                            self.config,
+                            Path(res["mkv_file"]),
+                            Path(res["original_file"]),
+                        )
+                    except Exception as exc:
+                        logger.warning("Webhook dispatch failed for %s: %s",
+                                       fp, exc)
             except Exception as exc:
                 logger.error("Error processing %s: %s", fp, exc)
                 results.append({
