@@ -15,7 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-dev \
     python3-pip \
     build-essential \
-    ffmpeg \
+    curl \
+    ca-certificates \
+    xz-utils \
     mkvtoolnix \
     tesseract-ocr \
     tesseract-ocr-eng \
@@ -34,6 +36,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Install a patched static FFmpeg (>= 8.1.2) to fix CVE-2026-8461
+ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+RUN curl -fsSL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
+    && mkdir -p /tmp/ffmpeg \
+    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg --strip-components=1 \
+    && install -m 0755 /tmp/ffmpeg/bin/ffmpeg /usr/local/bin/ffmpeg \
+    && install -m 0755 /tmp/ffmpeg/bin/ffprobe /usr/local/bin/ffprobe \
+    && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz \
+    && /usr/local/bin/ffmpeg -version | head -n1
 
 WORKDIR /app
 
